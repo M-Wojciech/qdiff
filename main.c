@@ -37,7 +37,7 @@ void display_file_data(git_repository *repo, git_tree *tree, const char *file)
     printw("File content:\n%s\n", (const char *)git_blob_rawcontent(blob));
 }
 
-int load_parent_commit(git_commit **out, git_commit *commit)
+int get_parent_commit(git_commit **out, git_commit *commit)
 {
     int error;
     git_commit * parent;
@@ -47,6 +47,31 @@ int load_parent_commit(git_commit **out, git_commit *commit)
     }
     *out = parent;
     return 0;
+}
+
+int get_ancestor_commits_with_older_file(commit_stack_t **out, git_commit *descendant)
+{
+    if ((*out)->top != NULL)
+    {
+        return -1;
+    }
+
+    int ancestor_count = 0;
+    commit_stack_t search_stack;
+    search_stack.top = NULL;
+    
+
+    // make empty list of visited commits 'visited'
+    // get parents of 'descendant', add them to 'search_stack', add them to 'visited'
+
+    // loop (end if 'search_stack' is empty)
+        // chcek if top commit in 'search_stack' has file named like 'file'
+        // if not pop it from 'search_stack' and continue
+        // else if that file is different push it to 'out', pop it from 'search_stack', increment 'ancestor_counter' and continue
+        // else go through top commit in 'search_stack' parents
+            // if given parent was visited go to next
+            // else add it to 'search_stack'
+    // return 'ancestor_counter'
 }
 
 int main(int argc, char *argv[])
@@ -98,7 +123,7 @@ int main(int argc, char *argv[])
             {
                 clear();
                 push_commit_to_stack(&commit_history, current_commit);
-                error = load_parent_commit(&current_commit, current_commit);
+                error = get_parent_commit(&current_commit, current_commit);
                 libgit_error_check(error);
                 display_commit_data(current_commit);
                 error = git_commit_tree(&commit_tree, current_commit);
