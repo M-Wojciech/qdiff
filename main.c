@@ -34,18 +34,19 @@ void display_file_data(git_repository *repo, git_tree *tree, const char *file)
     error = git_blob_lookup(&blob, repo, git_tree_entry_id(entry));
     libgit_error_check(error);
     printw("File content:\n%s\n", (const char *)git_blob_rawcontent(blob));
+    git_tree_entry_free(entry);
 }
 
-void display_parent_menu(commit_graph_node_t *node)
+void display_ancestor_menu(commit_graph_node_t *node)
 {
     clear();
-    printw("Select a parent:\n");
+    printw("Select an ancestor:\n");
     for (size_t i = 0; i < node->ancestor_count; ++i)
     {
         const char *message = git_commit_message(node->ancestors[i]->commit);
         printw("[%zu] %s\n", i, message);
     }
-    printw("Enter the number of the parent to select: ");
+    printw("Enter the number of the ancestor to select: ");
 }
 
 int main(int argc, char *argv[])
@@ -73,7 +74,7 @@ int main(int argc, char *argv[])
     libgit_error_check(error);
 
     // Initialize commit graph walk
-    commit_graph_walk_t *walk = commit_graph_walk_init(head_commit);
+    commit_graph_walk_t *walk = commit_graph_walk_init(head_commit, filename);
 
     // ncurses initialization
     initscr();
@@ -93,19 +94,19 @@ int main(int argc, char *argv[])
     {
         switch (user_input)
         {
-        case 'h': // Navigate to a parent commit
+        case 'h': // Navigate to an ancestor commit
             if (walk->current->ancestor_count > 0)
             {
-                display_parent_menu(walk->current);
+                display_ancestor_menu(walk->current);
                 echo();
-                int parent_choice;
-                scanw("%d", &parent_choice);
+                int ancestor_choice;
+                scanw("%d", &ancestor_choice);
                 noecho();
 
-                if (parent_choice >= 0 && (size_t)parent_choice < walk->current->ancestor_count)
+                if (ancestor_choice >= 0 && (size_t)ancestor_choice < walk->current->ancestor_count)
                 {
                     clear();
-                    commit_graph_walk_to_parent(walk, parent_choice);
+                    commit_graph_walk_to_ancestor(walk, ancestor_choice);
                     display_commit_data(walk->current->commit);
                     error = git_commit_tree(&commit_tree, walk->current->commit);
                     libgit_error_check(error);
@@ -113,11 +114,11 @@ int main(int argc, char *argv[])
                 }
             }
             break;
-        case 'l': // Navigate back to the child commit
+        case 'l': // Navigate back to the descendant commit
             if (walk->current->descendant)
             {
                 clear();
-                commit_graph_walk_to_child(walk);
+                commit_graph_walk_to_descendant(walk);
                 display_commit_data(walk->current->commit);
                 error = git_commit_tree(&commit_tree, walk->current->commit);
                 libgit_error_check(error);
