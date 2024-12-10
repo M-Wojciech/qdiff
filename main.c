@@ -3,7 +3,6 @@
 #include <unistd.h>
 #include <ncurses.h>
 #include <libgen.h>
-#include "commit_graph_node.h"
 #include "commit_graph_walk.h"
 
 void libgit_error_check(int error)
@@ -41,9 +40,9 @@ void display_parent_menu(commit_graph_node_t *node)
 {
     clear();
     printw("Select a parent:\n");
-    for (size_t i = 0; i < node->parent_count; ++i)
+    for (size_t i = 0; i < node->ancestor_count; ++i)
     {
-        const char *message = git_commit_message(node->parents[i]->commit);
+        const char *message = git_commit_message(node->ancestors[i]->commit);
         printw("[%zu] %s\n", i, message);
     }
     printw("Enter the number of the parent to select: ");
@@ -83,9 +82,8 @@ int main(int argc, char *argv[])
 
     // Display starting commit
     git_tree *commit_tree = NULL;
-    commit_graph_node_t *current_node = walk->current;
-    display_commit_data(current_node->commit);
-    error = git_commit_tree(&commit_tree, current_node->commit);
+    display_commit_data(walk->current->commit);
+    error = git_commit_tree(&commit_tree, walk->current->commit);
     libgit_error_check(error);
     display_file_data(repo, commit_tree, filename);
 
@@ -96,33 +94,32 @@ int main(int argc, char *argv[])
         switch (user_input)
         {
         case 'h': // Navigate to a parent commit
-            fetch_parents(current_node, repo); // Ensure parents are fetched
-            if (current_node->parent_count > 0)
+            if (walk->current->ancestor_count > 0)
             {
-                display_parent_menu(current_node);
+                display_parent_menu(walk->current);
                 echo();
                 int parent_choice;
                 scanw("%d", &parent_choice);
                 noecho();
 
-                if (parent_choice >= 0 && (size_t)parent_choice < current_node->parent_count)
+                if (parent_choice >= 0 && (size_t)parent_choice < walk->current->ancestor_count)
                 {
                     clear();
-                    current_node = commit_graph_walk_to_parent(walk, parent_choice);
-                    display_commit_data(current_node->commit);
-                    error = git_commit_tree(&commit_tree, current_node->commit);
+                    commit_graph_walk_to_parent(walk, parent_choice);
+                    display_commit_data(walk->current->commit);
+                    error = git_commit_tree(&commit_tree, walk->current->commit);
                     libgit_error_check(error);
                     display_file_data(repo, commit_tree, filename);
                 }
             }
             break;
         case 'l': // Navigate back to the child commit
-            if (current_node->child)
+            if (walk->current->descendant)
             {
                 clear();
-                current_node = commit_graph_walk_to_child(walk);
-                display_commit_data(current_node->commit);
-                error = git_commit_tree(&commit_tree, current_node->commit);
+                commit_graph_walk_to_child(walk);
+                display_commit_data(walk->current->commit);
+                error = git_commit_tree(&commit_tree, walk->current->commit);
                 libgit_error_check(error);
                 display_file_data(repo, commit_tree, filename);
             }
