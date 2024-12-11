@@ -1,7 +1,6 @@
 #include "windows.h"
 
 
-
 commit_display *init_commit_display(int height, int width, int starty, int startx, commit_graph_walk_t *walk)
 {
     commit_display *display = malloc(sizeof(commit_display));
@@ -22,12 +21,18 @@ commit_display *init_commit_display(int height, int width, int starty, int start
 
 void commit_display_refresh(commit_display *display)
 {
+    if (!display)
+    {
+        return;
+    }
+    // clear windows
+    wclear(display->commit_info);
+    wclear(display->file_content);
     // print commit info
     const git_oid *comit_oid = git_commit_id(display->walk->current->commit);
     const char *message = git_commit_message(display->walk->current->commit);
     wprintw(display->commit_info ,"Commit: %s\nMessage: %s\n", git_oid_tostr_s(comit_oid), message);
     attroff(COLOR_PAIR(1));
-
     //print file data
     git_blob *blob = NULL;
     git_blob_lookup(&blob, git_commit_owner(display->walk->current->commit), git_tree_entry_id(display->walk->current->entry));
