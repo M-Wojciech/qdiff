@@ -1,6 +1,8 @@
 #ifndef COMMIT_GRAPH_WALK_H
 #define COMMIT_GRAPH_WALK_H
 
+#include <git2.h>
+
 /*
 Naming might be confusing as walking to descendants
 is walking to root here and walking to ancestors is

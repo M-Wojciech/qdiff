@@ -10,6 +10,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pedantic")
 set(SOURCES
     main.c
     commit_graph_walk.c
+    windows.c
 )
 
 # Include directories
