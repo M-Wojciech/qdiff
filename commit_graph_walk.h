@@ -12,8 +12,8 @@ we start by 'youngest' as root and find its ancestors.
 // Structure representing a single node in the commit graph
 typedef struct commit_graph_node
 {
-    git_commit *commit;                     // Pointer to the associated Git commit
-    const git_tree_entry *entry;                  // entry of tha file we create graph for.
+    git_commit *commit;               // Pointer to the associated Git commit
+    git_tree_entry *entry;            // entry of the file we create graph for.
     struct commit_graph_node *descendant;   // Pointer to the descendant node (commit from which this was found)
     struct commit_graph_node **ancestors;   // Pointer to an array of ancestor nodes
     size_t ancestor_count;                  // Number of ancestors (size of the parents array)
@@ -28,15 +28,22 @@ typedef struct
 // helper for searching through graph
 typedef struct
 {
-    const git_oid **list;       // Array of pointers to git_oid
+    git_oid **list;       // Array of pointers to git_oid
     size_t size;          // Current number of elements
     size_t capacity;      // Current capacity of the list
 } visited_set_t;
 
-commit_graph_walk_t *commit_graph_walk_init(git_commit *start_commit, const char *filename);
+commit_graph_node_t *commit_graph_node_init(void);
+commit_graph_walk_t *commit_graph_walk_init(git_commit *start_commit, const char *_filename);
 void commit_graph_walk_free(commit_graph_walk_t *walk);
 int commit_graph_walk_to_ancestor(commit_graph_walk_t *walk, int ancestor_index);
 int commit_graph_walk_to_descendant(commit_graph_walk_t *walk);
 int commit_graph_fetch_ancestors(commit_graph_node_t *node);
+void search_commits_recursive(git_commit *commit, commit_graph_node_t *search_root, visited_set_t *visited, const char *filename);
+
+visited_set_t *visited_set_init(void);
+void visited_set_add(visited_set_t *visited, const git_oid *oid);
+int visited_set_contains(visited_set_t *visited, const git_oid *oid);
+void visited_set_free(visited_set_t *visited);
 
 #endif

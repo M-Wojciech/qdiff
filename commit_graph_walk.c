@@ -4,6 +4,22 @@
 #include <unistd.h>
 #include "commit_graph_walk.h"
 
+commit_graph_node_t *commit_graph_node_init(void)
+{
+    commit_graph_node_t *node = malloc(sizeof(commit_graph_node_t));
+    if (!node)
+    {
+        return NULL;
+    }
+    node->commit = NULL;
+    node->entry = NULL;
+    node->descendant = NULL;
+    node->ancestors = NULL;
+    node->ancestor_count = 0;
+    node->ancestors_fetched = 0;
+    return node;
+}
+
 commit_graph_walk_t *commit_graph_walk_init(git_commit *start_commit, const char *_filename)
 {
     if (!_filename)
@@ -15,7 +31,7 @@ commit_graph_walk_t *commit_graph_walk_init(git_commit *start_commit, const char
     {
         return NULL;
     }
-    commit_graph_node_t *root = malloc(sizeof(commit_graph_node_t));
+    commit_graph_node_t *root = commit_graph_node_init();
     if (!root)
     {
         free(walk);
@@ -24,13 +40,11 @@ commit_graph_walk_t *commit_graph_walk_init(git_commit *start_commit, const char
 
     git_tree *commit_tree = NULL;
     git_commit_tree(&commit_tree, start_commit);
-    root->entry = git_tree_entry_byname(commit_tree, _filename);
-    root->commit = start_commit;
-    root->descendant = NULL;
-    root->ancestors = NULL;
-    root->ancestor_count = 0;
+    const git_tree_entry *tmp_entry = git_tree_entry_byname(commit_tree, _filename);
+    git_tree_entry_dup(&(root->entry), tmp_entry);
+    git_tree_free(commit_tree);
+    git_commit_dup(&(root->commit), start_commit);
     commit_graph_fetch_ancestors(root);
-
     walk->current = root;
     return walk;
 }
@@ -48,6 +62,7 @@ void commit_graph_free_node(commit_graph_node_t *node)
     }
     free(node->ancestors);
     git_commit_free(node->commit);
+    git_tree_entry_free(node->entry);
     free(node);
 }
 
@@ -76,14 +91,96 @@ int commit_graph_fetch_ancestors(commit_graph_node_t *node)
     {
         return -1;
     }
+    // Initialize visited set
+    visited_set_t *visited = visited_set_init();
 
     // check all parents (node children) with recursive function
     size_t parent_count = git_commit_parentcount(node->commit);
-    const git_oid *parent_oid;
+    git_commit * parent = NULL;
+    const char *entry_name = git_tree_entry_name(node->entry);
     for (size_t i = 0; i < parent_count; i++)
     {
-
+        git_commit_parent(&parent, node->commit, i); // freed in recursive function if wont be used
+        search_commits_recursive(parent, node, visited, entry_name);
     }
+    // Mark as fetched and clean up
+    node->ancestors_fetched = 1;
+    visited_set_free(visited);
+    return 0;
+}
+
+void search_commits_recursive(git_commit *commit, commit_graph_node_t *search_root, visited_set_t *visited, const char *filename)
+{
+    if (!commit || visited_set_contains(visited, git_commit_id(commit)))
+    {
+        return; // Stop if node is null or already visited
+    }
+    
+    // Add current commit to visited
+    visited_set_add(visited, git_commit_id(commit));
+
+    // Check if the file was modified in this commit
+    git_tree *tree;
+    git_commit_tree(&tree, commit);
+    const git_tree_entry *entry = git_tree_entry_byname(tree, filename);
+    if (!entry)
+    {
+        // // check for rename
+        // if (entry) // renamed in commit
+        // {
+        //     search_root->ancestor_count++;
+        //     search_root->ancestors = realloc(search_root->ancestors, search_root->ancestor_count * sizeof(commit_graph_node_t *));
+        //     search_root->ancestors[search_root->ancestor_count - 1] = commit_graph_node_init();
+        //     search_root->ancestors[search_root->ancestor_count - 1]->commit = commit;
+        //     git_tree_entry *tmp_entry;
+        //     git_tree_entry_dup(&tmp_entry, entry);
+        //     search_root->ancestors[search_root->ancestor_count - 1]->entry = tmp_entry;
+        //     search_root->ancestors[search_root->ancestor_count - 1]->descendant = search_root;
+        //     git_tree_free(tree);
+        //     return;
+        // }
+        // // File doesn't exist in this commit, stop recursion
+        git_tree_free(tree);
+        git_commit_free(commit);
+        return;
+    }
+
+    // If file was modified, add to ancestors and stop recursion
+    if (!git_tree_entry_cmp(search_root->entry, entry))
+    {
+        search_root->ancestor_count++;
+        search_root->ancestors = realloc(search_root->ancestors, search_root->ancestor_count * sizeof(commit_graph_node_t *));
+        search_root->ancestors[search_root->ancestor_count - 1] = commit_graph_node_init();
+        search_root->ancestors[search_root->ancestor_count - 1]->commit = commit;
+        git_tree_entry *tmp_entry;
+        git_tree_entry_dup(&tmp_entry, entry);
+        search_root->ancestors[search_root->ancestor_count - 1]->entry = tmp_entry;
+        search_root->ancestors[search_root->ancestor_count - 1]->descendant = search_root;
+        git_tree_free(tree);
+        return;
+    }
+    git_tree_free(tree);
+
+    // Recurse into parents
+    size_t parent_count = git_commit_parentcount(commit);
+    git_commit *parent_commit;
+    for (size_t i = 0; i < parent_count; i++)
+    {
+        git_commit_parent(&parent_commit, commit, i);
+        search_commits_recursive(parent_commit, search_root, visited, filename);
+    }
+    git_commit_free(commit);
+    return;
+}
+
+void add_ancestor(commit_graph_node_t *search_root, git_commit *commit, const git_tree_entry *entry) {
+    search_root->ancestor_count++;
+    search_root->ancestors = realloc(search_root->ancestors, search_root->ancestor_count * sizeof(commit_graph_node_t *));
+    commit_graph_node_t *new_node = commit_graph_node_init();
+    search_root->ancestors[search_root->ancestor_count - 1] = new_node;
+    new_node->commit = commit;
+    git_tree_entry_dup(&(new_node->entry), entry);
+    new_node->descendant = search_root;
 }
 
 int commit_graph_walk_to_ancestor(commit_graph_walk_t *walk, int ancestor_index)
@@ -111,68 +208,8 @@ int commit_graph_walk_to_descendant(commit_graph_walk_t *walk)
     return 0;
 }
 
-void fetch_ancestors_recursive(
-    commit_graph_node_t *node, 
-    const char *filename, 
-    visited_set_t *visited)
-{
-    if (!node || visited_set_contains(visited, git_commit_id(node->commit)))
-    {
-        return; // Stop if node is null or already visited
-    }
-
-    // Add current commit to visited
-    visited_set_add(visited, git_commit_id(node->commit));
-
-    // Check if the file was modified in this commit
-    const git_tree *tree;
-    git_commit_tree(&tree, node->commit);
-    const git_tree_entry *entry = git_tree_entry_byname(tree, filename);
-
-    if (!entry)
-    {
-        // File doesn't exist in this commit, stop recursion
-        git_tree_free(tree);
-        return;
-    }
-
-    // If file was modified, add to ancestors and stop recursion
-    if (!node->entry || !git_tree_entry_cmp(node->entry, entry))
-    {
-        node->entry = entry;
-        node->ancestor_count++;
-        node->ancestors = realloc(node->ancestors, node->ancestor_count * sizeof(commit_graph_node_t *));
-        node->ancestors[node->ancestor_count - 1] = malloc(sizeof(commit_graph_node_t));
-        node->ancestors[node->ancestor_count - 1]->commit = node->commit; // Point to this commit
-        node->ancestors[node->ancestor_count - 1]->entry = entry; // Record the entry
-        git_tree_free(tree);
-        return;
-    }
-
-    // Recurse into parents
-    size_t parent_count = git_commit_parentcount(node->commit);
-    for (size_t i = 0; i < parent_count; i++)
-    {
-        git_commit *parent_commit;
-        git_commit_parent(&parent_commit, node->commit, i);
-
-        // Create a new node for the parent and recurse
-        commit_graph_node_t *parent_node = malloc(sizeof(commit_graph_node_t));
-        parent_node->commit = parent_commit;
-        parent_node->entry = NULL;
-        parent_node->descendant = node;
-        parent_node->ancestors = NULL;
-        parent_node->ancestor_count = 0;
-        parent_node->ancestors_fetched = 0;
-
-        fetch_ancestors_recursive(parent_node, filename, visited);
-    }
-
-    git_tree_free(tree);
-}
-
 // Initialize a visited set
-visited_set_t *visited_set_init()
+visited_set_t *visited_set_init(void)
 {
     visited_set_t *visited = malloc(sizeof(visited_set_t));
     if (!visited)
@@ -236,4 +273,3 @@ void visited_set_free(visited_set_t *visited)
     free(visited->list);
     free(visited);
 }
-
