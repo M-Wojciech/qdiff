@@ -88,7 +88,7 @@ void commit_display_update_menu(commit_display *display)
         {
             wattron(display->file_content, COLOR_PAIR(2));
         }
-        wprintw(display->file_content, "%.6s\t%s", git_oid_tostr_s(comit_oid), message);
+        mvwprintw(display->file_content, i, 0, "%.6s\t%s", git_oid_tostr_s(comit_oid), message);
         wattroff(display->file_content, COLOR_PAIR(2));
     }
 
