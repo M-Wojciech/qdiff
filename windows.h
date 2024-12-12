@@ -7,7 +7,7 @@
 typedef struct {
     WINDOW *commit_info;
     WINDOW *file_content;
-    int y_offset;
+    unsigned int y_offset;
     commit_graph_walk_t *walk;
     int menu_state;
 } commit_display;

@@ -143,6 +143,7 @@ int main(int argc, char *argv[])
                 case 'h':
                     commit_graph_walk_to_ancestor(active->walk, active->menu_state-1);
                     active->menu_state = 0;
+                    active->y_offset = 0;
                     commit_display_update(active);
                     doupdate();
                     break;
@@ -191,6 +192,7 @@ int main(int argc, char *argv[])
                     else if (active->walk->current->ancestor_count > 0)
                     {
                         commit_graph_walk_to_ancestor(active->walk, 0);
+                        active->y_offset = 0;
                         commit_display_update(active);
                         doupdate();
                     }
@@ -203,6 +205,7 @@ int main(int argc, char *argv[])
                     if (active->walk->current->descendant)
                     {
                         commit_graph_walk_to_descendant(active->walk);
+                        active->y_offset = 0;
                         commit_display_update(active);
                         doupdate();
                     }
@@ -212,8 +215,17 @@ int main(int argc, char *argv[])
                     }
                     break;
                 case 'j':
+                    active->y_offset++;
                     break;
                 case 'k':
+                    if (active->y_offset > 0)
+                    {
+                        active->y_offset--;
+                    }
+                    else
+                    {
+                        beep();
+                    }
                     break;
                 }
             }
