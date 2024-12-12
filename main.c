@@ -83,6 +83,7 @@ int main(int argc, char *argv[])
     start_color();
     use_default_colors();
     init_pair(1, COLOR_CYAN, -1);
+    init_pair(2, COLOR_GREEN, -1);
     clear();
     refresh();
     commit_display *active = l_display;
@@ -133,12 +134,39 @@ int main(int argc, char *argv[])
                 switch (user_input) // handle h, j, k, l on menu display
                 {
                 case 'h':
+                    commit_graph_walk_to_ancestor(active->walk, active->menu_state-1);
+                    active->menu_state = 0;
+                    commit_display_update(active);
+                    doupdate();
                     break;
                 case 'l':
+                    active->menu_state = 0;
+                    commit_display_update_file(active);
+                    doupdate();
                     break;
                 case 'j':
+                    if (active->menu_state < active->walk->current->ancestor_count)
+                    {
+                        active->menu_state++;
+                        commit_display_update_menu(active);
+                        doupdate();
+                    }
+                    else
+                    {
+                        beep();
+                    }
                     break;
                 case 'k':
+                    if (active->menu_state > 1)
+                    {
+                        active->menu_state--;
+                        commit_display_update_menu(active);
+                        doupdate();
+                    }
+                    else
+                    {
+                        beep();
+                    }
                     break;
                 }
             }
@@ -147,8 +175,17 @@ int main(int argc, char *argv[])
                 switch (user_input) // handle h, j, k, l on file display
                 {
                 case 'h':
-                    if (active->walk->current->ancestor_count > 0)
+                    if (active->walk->current->ancestor_count > 1)
                     {
+                        active->menu_state = 1;
+                        commit_display_update_menu(active);
+                        doupdate();
+                    }
+                    else if (active->walk->current->ancestor_count > 0)
+                    {
+                        commit_graph_walk_to_ancestor(active->walk, 0);
+                        commit_display_update(active);
+                        doupdate();
                     }
                     else
                     {
@@ -158,6 +195,9 @@ int main(int argc, char *argv[])
                 case 'l':
                     if (active->walk->current->descendant)
                     {
+                        commit_graph_walk_to_descendant(active->walk);
+                        commit_display_update(active);
+                        doupdate();
                     }
                     else
                     {

@@ -28,18 +28,18 @@ void commit_display_free(commit_display *display)
 
 void commit_display_update(commit_display *display)
 {
-    commit_display_info_update(display);
+    commit_display_update_info(display);
     if (display->menu_state)
     {
-        commit_display_menu_update(display);
+        commit_display_update_menu(display);
     }
     else
     {
-        commit_display_file_update(display);
+        commit_display_update_file(display);
     }
 }
 
-void commit_display_info_update(commit_display *display)
+void commit_display_update_info(commit_display *display)
 {
     if (!display)
     {
@@ -50,11 +50,13 @@ void commit_display_info_update(commit_display *display)
     // print commit info
     const git_oid *comit_oid = git_commit_id(display->walk->current->commit);
     const char *message = git_commit_message(display->walk->current->commit);
-    mvwprintw(display->commit_info, 0, 0,"Commit: %s\nMessage: %s\n", git_oid_tostr_s(comit_oid), message);
+    int free = COLS - 8;
+    mvwprintw(display->commit_info, 0, 0,"Commit: %.*s", free, git_oid_tostr_s(comit_oid));
+    mvwprintw(display->commit_info, 1, 0, "Message: %s", message);
     wnoutrefresh(display->commit_info);
 }
 
-void commit_display_file_update(commit_display *display)
+void commit_display_update_file(commit_display *display)
 {
     if (!display)
     {
@@ -69,11 +71,26 @@ void commit_display_file_update(commit_display *display)
     wnoutrefresh(display->file_content);
 }
 
-void commit_display_menu_update(commit_display *display)
+void commit_display_update_menu(commit_display *display)
 {
     if (!display)
     {
         return;
     }
+    // clear window
+    wclear(display->file_content);
+    // print menu options
+    for (int i = 0; i < display->walk->current->ancestor_count; i++)
+    {
+        const git_oid *comit_oid = git_commit_id(display->walk->current->ancestors[i]->commit);
+        const char *message = git_commit_message(display->walk->current->ancestors[i]->commit);
+        if (i+1 == display->menu_state)
+        {
+            wattron(display->file_content, COLOR_PAIR(2));
+        }
+        wprintw(display->file_content, "%.6s\t%s", git_oid_tostr_s(comit_oid), message);
+        wattroff(display->file_content, COLOR_PAIR(2));
+    }
+
     wnoutrefresh(display->file_content);
 }
