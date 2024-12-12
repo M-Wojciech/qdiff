@@ -6,8 +6,6 @@
 #include "commit_graph_walk.h"
 #include "windows.h"
 
-commit_display *l_display;
-commit_display *r_display;
 
 void handle_resize_sig(int sig)
 {
@@ -85,6 +83,7 @@ int main(int argc, char *argv[])
     use_default_colors();
     init_pair(1, COLOR_CYAN, -1);
     init_pair(2, COLOR_GREEN, -1);
+    init_pair(3, COLOR_RED, -1);
     clear();
     refresh();
     commit_display *active = l_display;
