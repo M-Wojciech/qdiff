@@ -9,30 +9,28 @@
 commit_display *l_display;
 commit_display *r_display;
 
-void handle_resize(int sig)
+void handle_resize_sig(int sig)
 {
     endwin();
     clear();
-    if (r_display)
-    {
-        mvvline(0, COLS/2, '|', LINES);
-    }
     refresh();
     if (l_display)
     {
         wresize(l_display->commit_info, 2, r_display ? COLS / 2 : COLS);
+        mvwin(l_display->commit_info, 0, 0);
         wresize(l_display->file_content, LINES - 2, r_display ? COLS / 2 : COLS);
         mvwin(l_display->file_content, 2, 0);
-        commit_display_refresh(l_display);
+        commit_display_update(l_display);
     }
     if (r_display)
     {
         wresize(r_display->commit_info, 2, (COLS - 1) / 2);
-        mvwin(l_display->commit_info, 0, COLS / 2 + 1);
+        mvwin(r_display->commit_info, 0, COLS / 2 + 1);
         wresize(r_display->file_content, LINES - 2, (COLS - 1) / 2);
         mvwin(r_display->file_content, 2, COLS / 2 + 1);
-        commit_display_refresh(r_display);
+        commit_display_update(r_display);
     }
+    doupdate();
 }
 
 void libgit_error_check(int error)
@@ -72,24 +70,26 @@ int main(int argc, char *argv[])
     libgit_error_check(error);
 
     // Initialize commit graph walk and free unnecesary commit object
-    commit_graph_walk_t *walk = commit_graph_walk_init(head_commit, filename);
+    commit_graph_walk_t *l_walk = commit_graph_walk_init(head_commit, filename);
     git_commit_free(head_commit);
 
-    // ncurses initialization and setup
+    // ncurses initialization and window setup
     initscr();
-    signal(SIGWINCH, handle_resize);
+    signal(SIGWINCH, handle_resize_sig);
     cbreak();
     noecho();
     curs_set(0);
-    l_display = init_commit_display(LINES, COLS, 0, 0, walk);
+    l_display = commit_display_init(LINES, COLS, 0, 0, l_walk);
     start_color();
     use_default_colors();
     init_pair(1, COLOR_CYAN, -1);
+    clear();
     refresh();
+    commit_display *active = l_display;
 
     // Display starting commit
-    commit_display_refresh(l_display);
-
+    commit_display_update(l_display);
+    doupdate();
 
     // User input loop
     int user_input;
@@ -97,32 +97,78 @@ int main(int argc, char *argv[])
     {
         switch (user_input)
         {
-        case 'h':
-            if (walk->current->ancestor_count > 0)
+        case 'i':
+            if (r_display)
             {
+                if (active == l_display)
+                {
+                    active = r_display;
+                }
+                else
+                {
+                    active = l_display;
+                }
+            }
+            break;
+        case 's':
+            if (r_display)
+            {
+                active = l_display;
+                commit_display_free(r_display);
+                r_display = NULL;
+                handle_resize_sig(-1);
             }
             else
             {
-                beep();
+                commit_graph_walk_t *r_walk = malloc(sizeof(commit_graph_walk_t));
+                r_walk->current = l_walk->current;
+                r_display = commit_display_init(LINES, COLS, 0, 0, r_walk);
+                commit_display_update(r_display);
+                handle_resize_sig(-1);
             }
             break;
-        case 'l':
-            if (walk->current->descendant)
+        default:
+            if (active->menu_state)
             {
-            }
-            break;
-        case 'j':
-            if (walk->current->descendant)
-            {
+                switch (user_input) // handle h, j, k, l on menu display
+                {
+                case 'h':
+                    break;
+                case 'l':
+                    break;
+                case 'j':
+                    break;
+                case 'k':
+                    break;
+                }
             }
             else
             {
-                beep();
-            }
-            break;
-        case 'k':
-            if (walk->current->descendant)
-            {
+                switch (user_input) // handle h, j, k, l on file display
+                {
+                case 'h':
+                    if (active->walk->current->ancestor_count > 0)
+                    {
+                    }
+                    else
+                    {
+                        beep();
+                    }
+                    break;
+                case 'l':
+                    if (active->walk->current->descendant)
+                    {
+                    }
+                    else
+                    {
+                        beep();
+                    }
+                    break;
+                case 'j':
+                    break;
+                case 'k':
+                    break;
+                }
             }
             break;
         }
@@ -131,7 +177,7 @@ int main(int argc, char *argv[])
     // Cleanup
     clear();
     endwin();
-    commit_graph_walk_free(walk);
+    commit_graph_walk_free(l_walk);
     git_repository_free(repo);
     git_libgit2_shutdown();
 
