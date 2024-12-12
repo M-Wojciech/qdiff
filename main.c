@@ -71,6 +71,7 @@ int main(int argc, char *argv[])
 
     // Initialize commit graph walk and free unnecesary commit object
     commit_graph_walk_t *l_walk = commit_graph_walk_init(head_commit, filename);
+    commit_graph_walk_t *r_walk = malloc(sizeof(commit_graph_walk_t));
     git_commit_free(head_commit);
 
     // ncurses initialization and window setup
@@ -114,15 +115,22 @@ int main(int argc, char *argv[])
         case 's':
             if (r_display)
             {
-                active = l_display;
-                commit_display_free(r_display);
+                if(active == l_display)
+                {
+                    commit_display_free(r_display);
+                } else
+                {
+                    commit_display_free(l_display);
+                    l_display = r_display;
+                    l_walk = r_walk;
+                    active = r_display;
+                }
                 r_display = NULL;
                 handle_resize_sig(-1);
             }
             else
             {
-                commit_graph_walk_t *r_walk = malloc(sizeof(commit_graph_walk_t));
-                r_walk->current = l_walk->current;
+                r_walk = l_walk;
                 r_display = commit_display_init(LINES, COLS, 0, 0, r_walk);
                 commit_display_update(r_display);
                 handle_resize_sig(-1);
