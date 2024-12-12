@@ -3,6 +3,7 @@
 commit_display *commit_display_init(int height, int width, int starty, int startx, commit_graph_walk_t *walk)
 {
     commit_display *display = malloc(sizeof(commit_display));
+    display->walk = malloc(sizeof(commit_graph_walk_t));
     if (!display)
     {
         return NULL;
@@ -11,17 +12,19 @@ commit_display *commit_display_init(int height, int width, int starty, int start
     display->file_content = newwin(height - 2, width, starty + 2, startx);
     refresh();
     display->y_offset = 0;
-    display->walk = walk;
+    display->walk->current = walk->current;
     display->menu_state = 0;
 
     wattron(display->commit_info, COLOR_PAIR(1));
 
     return display;
 }
+
 void commit_display_free(commit_display *display)
 {
     delwin(display->commit_info);
     delwin(display->file_content);
+    free(display->walk);
     free(display);
     display = NULL;
 }
@@ -65,15 +68,17 @@ void commit_display_update_file(commit_display *display)
     // clear window
     wclear(display->file_content);
     // do diff if split
-    if (r_display)
+    // if (r_display)
+    // {
+    //     commit_display_update_file_diff(display);
+    // }
+    // else
     {
-        commit_display_update_file_diff(display);
-        return;
-    }
     // print file data
     git_blob *blob = NULL;
     git_blob_lookup(&blob, git_commit_owner(display->walk->current->commit), git_tree_entry_id(display->walk->current->entry));
     wprintw(display->file_content, "File content:\n%s\n", (const char *)git_blob_rawcontent(blob));
+    }
     wnoutrefresh(display->file_content);
 }
 

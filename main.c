@@ -68,8 +68,7 @@ int main(int argc, char *argv[])
     libgit_error_check(error);
 
     // Initialize commit graph walk and free unnecesary commit object
-    commit_graph_walk_t *l_walk = commit_graph_walk_init(head_commit, filename);
-    commit_graph_walk_t *r_walk = malloc(sizeof(commit_graph_walk_t));
+    commit_graph_walk_t *hold_walk = commit_graph_walk_init(head_commit, filename);
     git_commit_free(head_commit);
 
     // ncurses initialization and window setup
@@ -78,7 +77,7 @@ int main(int argc, char *argv[])
     cbreak();
     noecho();
     curs_set(0);
-    l_display = commit_display_init(LINES, COLS, 0, 0, l_walk);
+    l_display = commit_display_init(LINES, COLS, 0, 0, hold_walk);
     start_color();
     use_default_colors();
     init_pair(1, COLOR_CYAN, -1);
@@ -96,6 +95,13 @@ int main(int argc, char *argv[])
     int user_input;
     while ((user_input = getch()) != 'q')
     {
+        commit_display_update(l_display);
+        doupdate();
+        if(r_display)
+        {
+            commit_display_update(r_display);
+            doupdate();
+        }
         switch (user_input)
         {
         case 'i':
@@ -121,7 +127,7 @@ int main(int argc, char *argv[])
                 {
                     commit_display_free(l_display);
                     l_display = r_display;
-                    l_walk = r_walk;
+                    l_display->walk->current = r_display->walk->current;
                     active = r_display;
                 }
                 r_display = NULL;
@@ -129,8 +135,8 @@ int main(int argc, char *argv[])
             }
             else
             {
-                r_walk = l_walk;
-                r_display = commit_display_init(LINES, COLS, 0, 0, r_walk);
+                hold_walk->current = active->walk->current;
+                r_display = commit_display_init(LINES, COLS, 0, 0, hold_walk);
                 commit_display_update(r_display);
                 handle_resize_sig(-1);
             }
@@ -236,7 +242,7 @@ int main(int argc, char *argv[])
     // Cleanup
     clear();
     endwin();
-    commit_graph_walk_free(l_walk);
+    commit_graph_walk_free(hold_walk);
     git_repository_free(repo);
     git_libgit2_shutdown();
 
