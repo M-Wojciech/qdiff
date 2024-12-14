@@ -6,8 +6,7 @@
 #include "commit_graph_walk.h"
 #include "windows.h"
 
-
-void handle_resize_sig(int sig)
+void handle_resize(void)
 {
     endwin();
     clear();
@@ -73,7 +72,6 @@ int main(int argc, char *argv[])
 
     // ncurses initialization and window setup
     initscr();
-    signal(SIGWINCH, handle_resize_sig);
     cbreak();
     noecho();
     curs_set(0);
@@ -95,15 +93,11 @@ int main(int argc, char *argv[])
     int user_input;
     while ((user_input = getch()) != 'q')
     {
-        commit_display_update(l_display);
-        doupdate();
-        if(r_display)
-        {
-            commit_display_update(r_display);
-            doupdate();
-        }
         switch (user_input)
         {
+        case KEY_RESIZE:
+            handle_resize();
+            break;
         case 'i':
             if (r_display)
             {
@@ -120,10 +114,11 @@ int main(int argc, char *argv[])
         case 's':
             if (r_display)
             {
-                if(active == l_display)
+                if (active == l_display)
                 {
                     commit_display_free(r_display);
-                } else
+                }
+                else
                 {
                     commit_display_free(l_display);
                     l_display = r_display;
@@ -131,14 +126,14 @@ int main(int argc, char *argv[])
                     active = r_display;
                 }
                 r_display = NULL;
-                handle_resize_sig(-1);
+                handle_resize();
             }
             else
             {
                 hold_walk->current = active->walk->current;
                 r_display = commit_display_init(LINES, COLS, 0, 0, hold_walk);
                 commit_display_update(r_display);
-                handle_resize_sig(-1);
+                handle_resize();
             }
             break;
         default:
@@ -147,9 +142,9 @@ int main(int argc, char *argv[])
                 switch (user_input) // handle h, j, k, l on menu display
                 {
                 case 'h':
-                    commit_graph_walk_to_ancestor(active->walk, active->menu_state-1);
+                    commit_graph_walk_to_ancestor(active->walk, active->menu_state - 1);
                     active->menu_state = 0;
-                    active->y_offset = 0;
+                    // active->y_offset = 0;
                     commit_display_update(active);
                     doupdate();
                     break;
@@ -198,7 +193,7 @@ int main(int argc, char *argv[])
                     else if (active->walk->current->ancestor_count > 0)
                     {
                         commit_graph_walk_to_ancestor(active->walk, 0);
-                        active->y_offset = 0;
+                        // active->y_offset = 0;
                         commit_display_update(active);
                         doupdate();
                     }
@@ -211,7 +206,7 @@ int main(int argc, char *argv[])
                     if (active->walk->current->descendant)
                     {
                         commit_graph_walk_to_descendant(active->walk);
-                        active->y_offset = 0;
+                        // active->y_offset = 0;
                         commit_display_update(active);
                         doupdate();
                     }
@@ -221,17 +216,17 @@ int main(int argc, char *argv[])
                     }
                     break;
                 case 'j':
-                    active->y_offset++;
+                    // active->y_offset++;
                     break;
                 case 'k':
-                    if (active->y_offset > 0)
-                    {
-                        active->y_offset--;
-                    }
-                    else
-                    {
-                        beep();
-                    }
+                    // if (active->y_offset > 0)
+                    // {
+                    //     active->y_offset--;
+                    // }
+                    // else
+                    // {
+                    //     beep();
+                    // }
                     break;
                 }
             }

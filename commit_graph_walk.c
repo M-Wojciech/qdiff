@@ -96,7 +96,7 @@ int commit_graph_fetch_ancestors(commit_graph_node_t *node)
 
     // check all parents (node children) with recursive function
     size_t parent_count = git_commit_parentcount(node->commit);
-    git_commit * parent = NULL;
+    git_commit *parent = NULL;
     const char *entry_name = git_tree_entry_name(node->entry);
     for (size_t i = 0; i < parent_count; i++)
     {
@@ -115,7 +115,7 @@ void search_commits_recursive(git_commit *commit, commit_graph_node_t *search_ro
     {
         return; // Stop if node is null or already visited
     }
-    
+
     // Add current commit to visited
     visited_set_add(visited, git_commit_id(commit));
 
@@ -173,7 +173,8 @@ void search_commits_recursive(git_commit *commit, commit_graph_node_t *search_ro
     return;
 }
 
-void add_ancestor(commit_graph_node_t *search_root, git_commit *commit, const git_tree_entry *entry) {
+void add_ancestor(commit_graph_node_t *search_root, git_commit *commit, const git_tree_entry *entry)
+{
     search_root->ancestor_count++;
     search_root->ancestors = realloc(search_root->ancestors, search_root->ancestor_count * sizeof(commit_graph_node_t *));
     commit_graph_node_t *new_node = commit_graph_node_init();

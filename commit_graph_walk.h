@@ -14,12 +14,12 @@ we start by 'youngest' as root and find its ancestors.
 // Structure representing a single node in the commit graph
 typedef struct commit_graph_node
 {
-    git_commit *commit;               // Pointer to the associated Git commit
-    git_tree_entry *entry;            // entry of the file we create graph for.
-    struct commit_graph_node *descendant;   // Pointer to the descendant node (commit from which this was found)
-    struct commit_graph_node **ancestors;   // Pointer to an array of ancestor nodes
-    size_t ancestor_count;                  // Number of ancestors (size of the parents array)
-    int ancestors_fetched;                  // Flag indicating if ancestors have been fetched (0 = not fetched, 1 = fetched)
+    git_commit *commit;                   // Pointer to the associated Git commit
+    git_tree_entry *entry;                // entry of the file we create graph for.
+    struct commit_graph_node *descendant; // Pointer to the descendant node (commit from which this was found)
+    struct commit_graph_node **ancestors; // Pointer to an array of ancestor nodes
+    size_t ancestor_count;                // Number of ancestors (size of the parents array)
+    int ancestors_fetched;                // Flag indicating if ancestors have been fetched (0 = not fetched, 1 = fetched)
 } commit_graph_node_t;
 
 typedef struct
@@ -30,9 +30,9 @@ typedef struct
 // helper for searching through graph
 typedef struct
 {
-    git_oid **list;       // Array of pointers to git_oid
-    size_t size;          // Current number of elements
-    size_t capacity;      // Current capacity of the list
+    git_oid **list;  // Array of pointers to git_oid
+    size_t size;     // Current number of elements
+    size_t capacity; // Current capacity of the list
 } visited_set_t;
 
 commit_graph_node_t *commit_graph_node_init(void);
