@@ -1,3 +1,4 @@
+#include <string.h>
 #include "windows.h"
 
 commit_display *commit_display_init(int height, int width, int starty, int startx, commit_graph_walk_t *walk)
@@ -14,7 +15,8 @@ commit_display *commit_display_init(int height, int width, int starty, int start
     // display->y_offset = 0;
     display->walk->current = walk->current;
     display->menu_state = 0;
-    display->blob_buffer = NULL;
+    display->buffer = NULL;
+    display->buffer_lines_count = 0;
 
     wattron(display->commit_info, COLOR_PAIR(1));
 
@@ -79,11 +81,74 @@ void commit_display_update_file(commit_display *display)
     // clear window
     wclear(display->file_content);
     // print file data
-    git_blob *blob = NULL;
-    git_blob_lookup(&blob, git_commit_owner(display->walk->current->commit), git_tree_entry_id(display->walk->current->entry));
-    wprintw(display->file_content, "File content:\n%s\n", (const char *)git_blob_rawcontent(blob));
+    // git_blob *blob = NULL;
+    // git_blob_lookup(&blob, git_commit_owner(display->walk->current->commit), git_tree_entry_id(display->walk->current->entry));
+    // wprintw(display->file_content, "File content:\n%s\n", (const char *)git_blob_rawcontent(blob));
+    // for(int i = 0; i < display->buffer_lines_count; i++)
+    // {
+        wprintw(display->file_content, display->buffer[0]->text);
+    // }
     // }
     wnoutrefresh(display->file_content);
+}
+
+void commit_display_update_buffer(commit_display *display)
+{
+    // get blob data
+    git_blob *blob = NULL;
+    git_blob_lookup(&blob, git_commit_owner(display->walk->current->commit), git_tree_entry_id(display->walk->current->entry));
+    size_t blob_size = git_blob_rawsize(blob);
+    const char *blob_content = git_blob_rawcontent(blob);
+
+    // count the number of lines in blob
+    size_t blob_lines = 0;
+    for (size_t i = 0; i < blob_size; i++)
+    {
+        if (blob_content[i] == '\n')
+        {
+            blob_lines++;
+        }
+    }
+    blob_lines += (blob_size > 0 && blob_content[blob_size - 1] != '\n') ? 1 : 0;
+
+    // free unused lines in buffer (terminal downsized)
+    for (int i = blob_lines; i < display->buffer_lines_count; i++)
+    {
+        free(display->buffer[i]->text);
+        free(display->buffer[i]);
+    }
+    // reallocate to match lines in blob
+    display->buffer = realloc(display->buffer, blob_lines * sizeof(line_data *));
+    // allocate for each line (terminal upsized)
+    for (int i = display->buffer_lines_count; i < blob_lines; i++)
+    {
+        display->buffer[i] = malloc(sizeof(line_data));
+    }
+    display->buffer_lines_count = blob_lines;
+
+    // copying from blob to buffer
+    const char *current_line = blob_content;
+    size_t line_start = 0;
+    size_t line_index = 0;
+    for (size_t i = 0; i < blob_size-1; i++)
+    {
+        mvprintw(1,0,"%d     %c", i, blob_content[i]);
+        mvprintw(2,0,"%s", blob_content);
+        refresh();
+        if (blob_content[i] == '\n' || i == blob_size - 1) {
+            size_t line_length = i + 1 - line_start;
+            display->buffer[line_index]->text = realloc(display->buffer[line_index]->text, line_length + 1);
+            memcpy(display->buffer[line_index]->text, current_line, line_length);
+            display->buffer[line_index]->text[line_length] = '\0';
+            display->buffer[line_index]->length = line_length;
+
+            current_line += line_length;
+            line_start += line_length;
+            line_index++;
+        }
+    }
+
+    git_blob_free(blob);
 }
 
 // void commit_display_update_file_diff(commit_display *display)

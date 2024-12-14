@@ -86,6 +86,7 @@ int main(int argc, char *argv[])
     commit_display *active = l_display;
 
     // Display starting commit
+    commit_display_update_buffer(l_display);
     commit_display_update(l_display);
     doupdate();
 
@@ -150,6 +151,7 @@ int main(int argc, char *argv[])
                     break;
                 case 'l':
                     active->menu_state = 0;
+                    // commit_display_update_buffer(active);
                     commit_display_update_file(active);
                     doupdate();
                     break;
@@ -194,6 +196,7 @@ int main(int argc, char *argv[])
                     {
                         commit_graph_walk_to_ancestor(active->walk, 0);
                         // active->y_offset = 0;
+                        commit_display_update_buffer(active);
                         commit_display_update(active);
                         doupdate();
                     }
@@ -207,6 +210,7 @@ int main(int argc, char *argv[])
                     {
                         commit_graph_walk_to_descendant(active->walk);
                         // active->y_offset = 0;
+                        commit_display_update_buffer(active);
                         commit_display_update(active);
                         doupdate();
                     }
