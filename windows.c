@@ -69,9 +69,12 @@ void commit_display_update_file(commit_display *display)
         return;
     }
     wclear(display->file_content);
-    for (int i = display->y_offset; i < display->buffer_lines_count; i++)
+    int y = 0, x;
+    int max_y = getmaxy(display->file_content);
+    for (int i = display->y_offset; i < display->buffer_lines_count && y < max_y-1; i++)
     {
         wprintw(display->file_content, display->buffer[i]->text);
+        getyx(display->file_content, y, x);
     }
     wnoutrefresh(display->file_content);
 }

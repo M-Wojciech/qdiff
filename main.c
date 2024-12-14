@@ -251,6 +251,8 @@ int main(int argc, char *argv[])
 
     // Cleanup
     clear();
+    nocbreak();
+    attrset(A_NORMAL);
     endwin();
     commit_graph_walk_free(hold_walk);
     git_repository_free(repo);
