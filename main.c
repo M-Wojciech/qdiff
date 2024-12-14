@@ -75,6 +75,7 @@ int main(int argc, char *argv[])
     cbreak();
     noecho();
     curs_set(0);
+    keypad(stdscr, TRUE);
     l_display = commit_display_init(LINES, COLS, 0, 0, hold_walk);
     start_color();
     use_default_colors();
@@ -144,17 +145,20 @@ int main(int argc, char *argv[])
                 switch (user_input) // handle h, j, k, l on menu display
                 {
                 case 'h':
+                case KEY_LEFT:
                     commit_graph_walk_to_ancestor(active->walk, active->menu_state - 1);
                     active->menu_state = 0;
                     active->y_offset = 0;
                     commit_display_update(active);
                     doupdate();
                     break;
+                case KEY_RIGHT:
                 case 'l':
                     active->menu_state = 0;
                     commit_display_update_file(active);
                     doupdate();
                     break;
+                case KEY_DOWN:
                 case 'j':
                     if (active->menu_state < active->walk->current->ancestor_count)
                     {
@@ -167,6 +171,7 @@ int main(int argc, char *argv[])
                         beep();
                     }
                     break;
+                case KEY_UP:
                 case 'k':
                     if (active->menu_state > 1)
                     {
@@ -185,6 +190,7 @@ int main(int argc, char *argv[])
             {
                 switch (user_input) // handle h, j, k, l on file display
                 {
+                case KEY_LEFT:
                 case 'h':
                     if (active->walk->current->ancestor_count > 1)
                     {
@@ -205,6 +211,7 @@ int main(int argc, char *argv[])
                         beep();
                     }
                     break;
+                case KEY_RIGHT:
                 case 'l':
                     if (active->walk->current->descendant)
                     {
@@ -219,6 +226,7 @@ int main(int argc, char *argv[])
                         beep();
                     }
                     break;
+                case KEY_DOWN:
                 case 'j':
                     if (active->y_offset < active->buffer_lines_count)
                     {
@@ -231,6 +239,7 @@ int main(int argc, char *argv[])
                         beep();
                     }
                     break;
+                case KEY_UP:
                 case 'k':
                     if (active->y_offset > 0)
                     {
