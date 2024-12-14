@@ -14,9 +14,10 @@ typedef struct
 {
     WINDOW *commit_info;
     WINDOW *file_content;
+    commit_graph_walk_t *walk;
     line_data **buffer;
     int buffer_lines_count;
-    commit_graph_walk_t *walk;
+    int y_offset;
     int menu_state;
 } commit_display;
 

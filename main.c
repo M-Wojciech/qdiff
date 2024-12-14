@@ -133,6 +133,7 @@ int main(int argc, char *argv[])
             {
                 hold_walk->current = active->walk->current;
                 r_display = commit_display_init(LINES, COLS, 0, 0, hold_walk);
+                commit_display_update_buffer(r_display);
                 commit_display_update(r_display);
                 handle_resize();
             }
@@ -145,13 +146,12 @@ int main(int argc, char *argv[])
                 case 'h':
                     commit_graph_walk_to_ancestor(active->walk, active->menu_state - 1);
                     active->menu_state = 0;
-                    // active->y_offset = 0;
+                    active->y_offset = 0;
                     commit_display_update(active);
                     doupdate();
                     break;
                 case 'l':
                     active->menu_state = 0;
-                    // commit_display_update_buffer(active);
                     commit_display_update_file(active);
                     doupdate();
                     break;
@@ -195,7 +195,7 @@ int main(int argc, char *argv[])
                     else if (active->walk->current->ancestor_count > 0)
                     {
                         commit_graph_walk_to_ancestor(active->walk, 0);
-                        // active->y_offset = 0;
+                        active->y_offset = 0;
                         commit_display_update_buffer(active);
                         commit_display_update(active);
                         doupdate();
@@ -209,7 +209,7 @@ int main(int argc, char *argv[])
                     if (active->walk->current->descendant)
                     {
                         commit_graph_walk_to_descendant(active->walk);
-                        // active->y_offset = 0;
+                        active->y_offset = 0;
                         commit_display_update_buffer(active);
                         commit_display_update(active);
                         doupdate();
@@ -220,17 +220,28 @@ int main(int argc, char *argv[])
                     }
                     break;
                 case 'j':
-                    // active->y_offset++;
+                    if (active->y_offset < active->buffer_lines_count)
+                    {
+                        active->y_offset++;
+                        commit_display_update(active);
+                        doupdate();
+                    }
+                    else
+                    {
+                        beep();
+                    }
                     break;
                 case 'k':
-                    // if (active->y_offset > 0)
-                    // {
-                    //     active->y_offset--;
-                    // }
-                    // else
-                    // {
-                    //     beep();
-                    // }
+                    if (active->y_offset > 0)
+                    {
+                        active->y_offset--;
+                        commit_display_update(active);
+                        doupdate();
+                    }
+                    else
+                    {
+                        beep();
+                    }
                     break;
                 }
             }

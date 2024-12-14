@@ -68,27 +68,11 @@ void commit_display_update_file(commit_display *display)
     {
         return;
     }
-    // do diff if split
-    // if (r_display)
-    // {
-    //     wclear(l_display->file_content);
-    //     wclear(r_display->file_content);
-    //     commit_display_update_file_diff(l_display);
-    //     commit_display_update_file_diff(r_display);
-    // }
-    // else
-    // {
-    // clear window
     wclear(display->file_content);
-    // print file data
-    // git_blob *blob = NULL;
-    // git_blob_lookup(&blob, git_commit_owner(display->walk->current->commit), git_tree_entry_id(display->walk->current->entry));
-    // wprintw(display->file_content, "File content:\n%s\n", (const char *)git_blob_rawcontent(blob));
-    // for(int i = 0; i < display->buffer_lines_count; i++)
-    // {
-        wprintw(display->file_content, display->buffer[0]->text);
-    // }
-    // }
+    for (int i = display->y_offset; i < display->buffer_lines_count; i++)
+    {
+        wprintw(display->file_content, display->buffer[i]->text);
+    }
     wnoutrefresh(display->file_content);
 }
 
@@ -127,22 +111,17 @@ void commit_display_update_buffer(commit_display *display)
     display->buffer_lines_count = blob_lines;
 
     // copying from blob to buffer
-    const char *current_line = blob_content;
     size_t line_start = 0;
     size_t line_index = 0;
-    for (size_t i = 0; i < blob_size-1; i++)
+    for (size_t i = 0; i < blob_size; i++)
     {
-        mvprintw(1,0,"%d     %c", i, blob_content[i]);
-        mvprintw(2,0,"%s", blob_content);
-        refresh();
         if (blob_content[i] == '\n' || i == blob_size - 1) {
             size_t line_length = i + 1 - line_start;
             display->buffer[line_index]->text = realloc(display->buffer[line_index]->text, line_length + 1);
-            memcpy(display->buffer[line_index]->text, current_line, line_length);
+            memcpy(display->buffer[line_index]->text, blob_content+line_start, line_length);
             display->buffer[line_index]->text[line_length] = '\0';
             display->buffer[line_index]->length = line_length;
 
-            current_line += line_length;
             line_start += line_length;
             line_index++;
         }
