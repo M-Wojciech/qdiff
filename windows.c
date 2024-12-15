@@ -77,6 +77,15 @@ void commit_display_update_file(commit_display *display)
     int max_y = getmaxy(display->file_content);
     for (int i = display->y_offset; i < display->buffer_lines_count && y < max_y - 1; i++)
     {
+        for (int j = 0; j < display->buffer[i]->lines_before && y < max_y - 1; j++)
+        {
+            wprintw(display->file_content, "\n");
+            y++;
+        }
+        if (y >= max_y - 1)
+        {
+            break;
+        }
         // Apply color based on diff mark
         switch (display->buffer[i]->diif_mark)
         {
@@ -165,6 +174,7 @@ void commit_display_reset_diff(commit_display *display)
     for (int i = 0; i < display->buffer_lines_count; i++)
     {
         display->buffer[i]->diif_mark = DIFF_CONTEXT;
+        display->buffer[i]->lines_before = 0;
     }
 }
 
@@ -179,18 +189,13 @@ void commit_display_get_diff(commit_display *old_display, commit_display *new_di
     git_blob_lookup(&old_blob, git_commit_owner(old_display->walk->current->commit), git_tree_entry_id(old_display->walk->current->entry));
     git_blob_lookup(&new_blob, git_commit_owner(new_display->walk->current->commit), git_tree_entry_id(new_display->walk->current->entry));
 
-    for (int i = 0; i < old_display->buffer_lines_count; i++)
-    {
-        old_display->buffer[i]->diif_mark = DIFF_CONTEXT;
-    }
-    for (int i = 0; i < new_display->buffer_lines_count; i++)
-    {
-        new_display->buffer[i]->diif_mark = DIFF_CONTEXT;
-    }
+    commit_display_reset_diff(old_display);
+    commit_display_reset_diff(new_display);
 
     diff_payload *payload = malloc(sizeof(diff_payload));
     payload->old_display = old_display;
     payload->new_display = new_display;
+    payload->lines_sync = 0;
 
     git_diff_blobs(old_blob, NULL, new_blob, NULL, NULL, NULL, NULL, NULL, diff_line_cb, payload);
 
@@ -205,36 +210,37 @@ int diff_line_cb(const git_diff_delta *delta, const git_diff_hunk *hunk, const g
     commit_display *old_display = diff_data->old_display;
     commit_display *new_display = diff_data->new_display;
 
-    // Determine the diff mark based on line origin
-    int diff_mark = DIFF_CONTEXT;
     switch (line->origin)
     {
     case GIT_DIFF_LINE_ADDITION:
     case GIT_DIFF_LINE_ADD_EOFNL:
-        diff_mark = DIFF_ADDITION;
+        if (line->new_lineno > 0 && line->new_lineno <= new_display->buffer_lines_count)
+        {
+            new_display->buffer[line->new_lineno - 1]->diif_mark = DIFF_ADDITION;
+            diff_data->lines_sync++;
+        }
         break;
     case GIT_DIFF_LINE_DELETION:
     case GIT_DIFF_LINE_DEL_EOFNL:
-        diff_mark = DIFF_DELETION;
-        break;
-    }
-
-    // Update the appropriate display's buffer
-    if (diff_mark == DIFF_DELETION)
-    {
-        // Deletion - mark in old display
         if (line->old_lineno > 0 && line->old_lineno <= old_display->buffer_lines_count)
         {
-            old_display->buffer[line->old_lineno - 1]->diif_mark = diff_mark;
+            old_display->buffer[line->old_lineno - 1]->diif_mark = DIFF_DELETION;
+            diff_data->lines_sync--;
         }
-    }
-    else if (diff_mark == DIFF_ADDITION)
-    {
-        // Addition - mark in new display
+        break;
+    case GIT_DIFF_LINE_CONTEXT:
+        if (line->old_lineno > 0 && line->old_lineno <= old_display->buffer_lines_count)
+        {
+            old_display->buffer[line->old_lineno - 1]->diif_mark = DIFF_CONTEXT;
+            old_display->buffer[line->old_lineno - 1]->lines_before = diff_data->lines_sync > 0 ? diff_data->lines_sync : 0;
+        }
         if (line->new_lineno > 0 && line->new_lineno <= new_display->buffer_lines_count)
         {
-            new_display->buffer[line->new_lineno - 1]->diif_mark = diff_mark;
+            new_display->buffer[line->new_lineno - 1]->diif_mark = DIFF_CONTEXT;
+            new_display->buffer[line->new_lineno - 1]->lines_before = diff_data->lines_sync < 0 ? -diff_data->lines_sync : 0;
         }
+        diff_data->lines_sync = 0;
+        break;
     }
 
     return 0;

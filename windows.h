@@ -27,6 +27,7 @@ typedef struct
 {
     commit_display *old_display;
     commit_display *new_display;
+    int lines_sync;
 } diff_payload;
 
 commit_display *commit_display_init(int height, int width, int starty, int startx, commit_graph_walk_t *walk);
