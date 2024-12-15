@@ -1,6 +1,10 @@
 #include <string.h>
 #include "windows.h"
 
+#define DIFF_CONTEXT 0
+#define DIFF_ADDITION 1
+#define DIFF_DELETION 2
+
 commit_display *commit_display_init(int height, int width, int starty, int startx, commit_graph_walk_t *walk)
 {
     commit_display *display = malloc(sizeof(commit_display));
@@ -71,15 +75,32 @@ void commit_display_update_file(commit_display *display)
     wclear(display->file_content);
     int y = 0, x;
     int max_y = getmaxy(display->file_content);
-    for (int i = display->y_offset; i < display->buffer_lines_count && y < max_y-1; i++)
+    for (int i = display->y_offset; i < display->buffer_lines_count && y < max_y - 1; i++)
     {
+        // Apply color based on diff mark
+        switch (display->buffer[i]->diif_mark)
+        {
+        case DIFF_ADDITION:
+            wattron(display->file_content, COLOR_PAIR(2)); // Green for additions
+            break;
+        case DIFF_DELETION:
+            wattron(display->file_content, COLOR_PAIR(3)); // Red for deletions
+            break;
+        }
+
+        // Print the line
         wprintw(display->file_content, display->buffer[i]->text);
+
+        // Reset color
+        wattroff(display->file_content, COLOR_PAIR(2));
+        wattroff(display->file_content, COLOR_PAIR(3));
+
         getyx(display->file_content, y, x);
     }
     wnoutrefresh(display->file_content);
 }
 
-void commit_display_update_buffer(commit_display *display)
+void commit_display_load_buffer(commit_display *display)
 {
     // get blob data
     git_blob *blob = NULL;
@@ -118,14 +139,16 @@ void commit_display_update_buffer(commit_display *display)
     size_t line_index = 0;
     for (size_t i = 0; i < blob_size; i++)
     {
-        if (blob_content[i] == '\n' || i == blob_size - 1) {
+        if (blob_content[i] == '\n' || i == blob_size - 1)
+        {
             size_t line_length = i + 1 - line_start;
             display->buffer[line_index]->text = realloc(display->buffer[line_index]->text, line_length + 1);
-            memcpy(display->buffer[line_index]->text, blob_content+line_start, line_length);
+            memcpy(display->buffer[line_index]->text, blob_content + line_start, line_length);
             display->buffer[line_index]->text[line_length] = '\0';
             display->buffer[line_index]->length = line_length;
 
             line_start += line_length;
+            display->buffer[line_index]->diif_mark = 0;
             line_index++;
         }
     }
@@ -133,41 +156,89 @@ void commit_display_update_buffer(commit_display *display)
     git_blob_free(blob);
 }
 
-// void commit_display_update_file_diff(commit_display *display)
-// {
-//     // Get blobs from both displays
-//     git_blob *l_blob = NULL;
-//     git_blob *r_blob = NULL;
-//     git_blob_lookup(&l_blob, git_commit_owner(l_display->walk->current->commit), git_tree_entry_id(l_display->walk->current->entry));
-//     git_blob_lookup(&r_blob, git_commit_owner(r_display->walk->current->commit), git_tree_entry_id(r_display->walk->current->entry));
+void commit_display_reset_diff(commit_display *display)
+{
+    if (!display)
+    {
+        return;
+    }
+    for (int i = 0; i < display->buffer_lines_count; i++)
+    {
+        display->buffer[i]->diif_mark = DIFF_CONTEXT;
+    }
+}
 
-//     diff_payload *payload = malloc(sizeof(diff_payload));
-//     payload->display = malloc(sizeof(commit_display *));
-//     payload->display = display;
-//     payload->blob = malloc(sizeof(git_blob *));
-//     payload->blob = l_blob;
-//     payload->current_offset = 0;
+void commit_display_get_diff(commit_display *old_display, commit_display *new_display)
+{
+    if (!old_display || !new_display)
+    {
+        return;
+    }
+    git_blob *old_blob = NULL;
+    git_blob *new_blob = NULL;
+    git_blob_lookup(&old_blob, git_commit_owner(old_display->walk->current->commit), git_tree_entry_id(old_display->walk->current->entry));
+    git_blob_lookup(&new_blob, git_commit_owner(new_display->walk->current->commit), git_tree_entry_id(new_display->walk->current->entry));
 
-//     git_diff *diff = NULL;
-//     git_diff_blobs(r_blob, NULL, l_blob, NULL, NULL, NULL, NULL, NULL, diff_line_cb, payload);
-//     wnoutrefresh(display->file_content);
-// }
+    for (int i = 0; i < old_display->buffer_lines_count; i++)
+    {
+        old_display->buffer[i]->diif_mark = DIFF_CONTEXT;
+    }
+    for (int i = 0; i < new_display->buffer_lines_count; i++)
+    {
+        new_display->buffer[i]->diif_mark = DIFF_CONTEXT;
+    }
 
-// int diff_line_cb(const git_diff_delta *delta, const git_diff_hunk *hunk, const git_diff_line *line, void *payload)
-// {
-//     diff_payload *payload_c = (diff_payload *)payload;
-//     const char *blob_content = git_blob_rawcontent(payload_c->blob);
-//     size_t blob_size = git_blob_rawsize(payload_c->blob);
+    diff_payload *payload = malloc(sizeof(diff_payload));
+    payload->old_display = old_display;
+    payload->new_display = new_display;
 
-//     // Print blob content up to this line
-//     while (payload_c->current_offset < blob_size && payload_c->current_offset < line->content_offset)
-//     {
-//         wprintw(payload_c->display->file_content, "%c", blob_content[payload_c->current_offset]);
-//         payload_c->current_offset++;
-//     }
+    git_diff_blobs(old_blob, NULL, new_blob, NULL, NULL, NULL, NULL, NULL, diff_line_cb, payload);
 
-//     return 0;
-// }
+    git_blob_free(old_blob);
+    git_blob_free(new_blob);
+    free(payload);
+}
+
+int diff_line_cb(const git_diff_delta *delta, const git_diff_hunk *hunk, const git_diff_line *line, void *payload)
+{
+    diff_payload *diff_data = (diff_payload *)payload;
+    commit_display *old_display = diff_data->old_display;
+    commit_display *new_display = diff_data->new_display;
+
+    // Determine the diff mark based on line origin
+    int diff_mark = DIFF_CONTEXT;
+    switch (line->origin)
+    {
+    case GIT_DIFF_LINE_ADDITION:
+    case GIT_DIFF_LINE_ADD_EOFNL:
+        diff_mark = DIFF_ADDITION;
+        break;
+    case GIT_DIFF_LINE_DELETION:
+    case GIT_DIFF_LINE_DEL_EOFNL:
+        diff_mark = DIFF_DELETION;
+        break;
+    }
+
+    // Update the appropriate display's buffer
+    if (diff_mark == DIFF_DELETION)
+    {
+        // Deletion - mark in old display
+        if (line->old_lineno > 0 && line->old_lineno <= old_display->buffer_lines_count)
+        {
+            old_display->buffer[line->old_lineno - 1]->diif_mark = diff_mark;
+        }
+    }
+    else if (diff_mark == DIFF_ADDITION)
+    {
+        // Addition - mark in new display
+        if (line->new_lineno > 0 && line->new_lineno <= new_display->buffer_lines_count)
+        {
+            new_display->buffer[line->new_lineno - 1]->diif_mark = diff_mark;
+        }
+    }
+
+    return 0;
+}
 
 void commit_display_update_menu(commit_display *display)
 {
@@ -191,4 +262,28 @@ void commit_display_update_menu(commit_display *display)
     }
 
     wnoutrefresh(display->file_content);
+}
+
+void handle_resize(commit_display *l_display, commit_display *r_display)
+{
+    endwin();
+    clear();
+    refresh();
+    if (l_display)
+    {
+        wresize(l_display->commit_info, 2, r_display ? COLS / 2 : COLS);
+        mvwin(l_display->commit_info, 0, 0);
+        wresize(l_display->file_content, LINES - 2, r_display ? COLS / 2 : COLS);
+        mvwin(l_display->file_content, 2, 0);
+        commit_display_update(l_display);
+    }
+    if (r_display)
+    {
+        wresize(r_display->commit_info, 2, (COLS - 1) / 2);
+        mvwin(r_display->commit_info, 0, COLS / 2 + 1);
+        wresize(r_display->file_content, LINES - 2, (COLS - 1) / 2);
+        mvwin(r_display->file_content, 2, COLS / 2 + 1);
+        commit_display_update(r_display);
+    }
+    doupdate();
 }

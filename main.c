@@ -6,30 +6,6 @@
 #include "commit_graph_walk.h"
 #include "windows.h"
 
-void handle_resize(void)
-{
-    endwin();
-    clear();
-    refresh();
-    if (l_display)
-    {
-        wresize(l_display->commit_info, 2, r_display ? COLS / 2 : COLS);
-        mvwin(l_display->commit_info, 0, 0);
-        wresize(l_display->file_content, LINES - 2, r_display ? COLS / 2 : COLS);
-        mvwin(l_display->file_content, 2, 0);
-        commit_display_update(l_display);
-    }
-    if (r_display)
-    {
-        wresize(r_display->commit_info, 2, (COLS - 1) / 2);
-        mvwin(r_display->commit_info, 0, COLS / 2 + 1);
-        wresize(r_display->file_content, LINES - 2, (COLS - 1) / 2);
-        mvwin(r_display->file_content, 2, COLS / 2 + 1);
-        commit_display_update(r_display);
-    }
-    doupdate();
-}
-
 void libgit_error_check(int error)
 {
     if (error < 0)
@@ -76,6 +52,8 @@ int main(int argc, char *argv[])
     noecho();
     curs_set(0);
     keypad(stdscr, TRUE);
+    commit_display *l_display;
+    commit_display *r_display;
     l_display = commit_display_init(LINES, COLS, 0, 0, hold_walk);
     start_color();
     use_default_colors();
@@ -87,7 +65,7 @@ int main(int argc, char *argv[])
     commit_display *active = l_display;
 
     // Display starting commit
-    commit_display_update_buffer(l_display);
+    commit_display_load_buffer(l_display);
     commit_display_update(l_display);
     doupdate();
 
@@ -98,7 +76,7 @@ int main(int argc, char *argv[])
         switch (user_input)
         {
         case KEY_RESIZE:
-            handle_resize();
+            handle_resize(l_display, r_display);
             break;
         case 'i':
             if (r_display)
@@ -128,15 +106,16 @@ int main(int argc, char *argv[])
                     active = r_display;
                 }
                 r_display = NULL;
-                handle_resize();
+                commit_display_reset_diff(active);
+                handle_resize(l_display, r_display);
             }
             else
             {
                 hold_walk->current = active->walk->current;
                 r_display = commit_display_init(LINES, COLS, 0, 0, hold_walk);
-                commit_display_update_buffer(r_display);
+                commit_display_load_buffer(r_display);
                 commit_display_update(r_display);
-                handle_resize();
+                handle_resize(l_display, r_display);
             }
             break;
         default:
@@ -149,6 +128,11 @@ int main(int argc, char *argv[])
                     commit_graph_walk_to_ancestor(active->walk, active->menu_state - 1);
                     active->menu_state = 0;
                     active->y_offset = 0;
+                    commit_display_get_diff(l_display, r_display);
+                    if (r_display)
+                    {
+                        commit_display_update_file(active==r_display ? l_display : r_display);
+                    }
                     commit_display_update(active);
                     doupdate();
                     break;
@@ -202,7 +186,12 @@ int main(int argc, char *argv[])
                     {
                         commit_graph_walk_to_ancestor(active->walk, 0);
                         active->y_offset = 0;
-                        commit_display_update_buffer(active);
+                        commit_display_load_buffer(active);
+                        commit_display_get_diff(l_display, r_display);
+                        if (r_display)
+                        {
+                            commit_display_update_file(active==r_display ? l_display : r_display);
+                        }
                         commit_display_update(active);
                         doupdate();
                     }
@@ -217,7 +206,12 @@ int main(int argc, char *argv[])
                     {
                         commit_graph_walk_to_descendant(active->walk);
                         active->y_offset = 0;
-                        commit_display_update_buffer(active);
+                        commit_display_load_buffer(active);
+                        commit_display_get_diff(l_display, r_display);
+                        if (r_display)
+                        {
+                            commit_display_update_file(active==r_display ? l_display : r_display);
+                        }
                         commit_display_update(active);
                         doupdate();
                     }
