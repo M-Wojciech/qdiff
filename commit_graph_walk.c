@@ -139,7 +139,7 @@ void search_commits_recursive(git_commit *commit, commit_graph_node_t *search_ro
         //     git_tree_free(tree);
         //     return;
         // }
-        // // File doesn't exist in this commit, stop recursion
+        // File doesn't exist in this commit, stop recursion
         git_tree_free(tree);
         git_commit_free(commit);
         return;

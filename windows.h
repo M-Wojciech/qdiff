@@ -38,7 +38,7 @@ void commit_display_update_info(commit_display *display);
 void commit_display_update_file(commit_display *display);
 void commit_display_update_menu(commit_display *display);
 int diff_line_cb(const git_diff_delta *delta, const git_diff_hunk *hunk, const git_diff_line *line, void *payload);
-void handle_resize(commit_display * l_display, commit_display *r_display);
+void handle_resize(commit_display *l_display, commit_display *r_display);
 void commit_display_get_diff(commit_display *old_display, commit_display *new_display);
 void commit_display_reset_diff(commit_display *display);
 int diff_line_cb(const git_diff_delta *delta, const git_diff_hunk *hunk, const git_diff_line *line, void *payload);

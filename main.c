@@ -131,7 +131,7 @@ int main(int argc, char *argv[])
                     commit_display_get_diff(l_display, r_display);
                     if (r_display)
                     {
-                        commit_display_update_file(active==r_display ? l_display : r_display);
+                        commit_display_update_file(active == r_display ? l_display : r_display);
                     }
                     commit_display_update(active);
                     doupdate();
@@ -190,7 +190,7 @@ int main(int argc, char *argv[])
                         commit_display_get_diff(l_display, r_display);
                         if (r_display)
                         {
-                            commit_display_update_file(active==r_display ? l_display : r_display);
+                            commit_display_update_file(active == r_display ? l_display : r_display);
                         }
                         commit_display_update(active);
                         doupdate();
@@ -210,7 +210,7 @@ int main(int argc, char *argv[])
                         commit_display_get_diff(l_display, r_display);
                         if (r_display)
                         {
-                            commit_display_update_file(active==r_display ? l_display : r_display);
+                            commit_display_update_file(active == r_display ? l_display : r_display);
                         }
                         commit_display_update(active);
                         doupdate();
