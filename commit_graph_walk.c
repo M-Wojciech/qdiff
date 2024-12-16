@@ -146,7 +146,7 @@ void search_commits_recursive(git_commit *commit, commit_graph_node_t *search_ro
     }
 
     // If file was modified, add to ancestors and stop recursion
-    if (!git_tree_entry_cmp(search_root->entry, entry))
+    if (!git_oid_equal(git_tree_entry_id(search_root->entry), git_tree_entry_id(entry)))
     {
         search_root->ancestor_count++;
         search_root->ancestors = realloc(search_root->ancestors, search_root->ancestor_count * sizeof(commit_graph_node_t *));
