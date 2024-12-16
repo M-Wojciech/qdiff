@@ -87,7 +87,7 @@ int commit_graph_fetch_ancestors(commit_graph_node_t *node)
     {
         return 1;
     }
-    if (node->ancestor_count != 0 || node->ancestors != NULL)
+    if (node->ancestor_count != 0 || node->ancestors)
     {
         return -1;
     }
@@ -95,13 +95,16 @@ int commit_graph_fetch_ancestors(commit_graph_node_t *node)
     visited_set_t *visited = visited_set_init();
 
     // check all parents (node children) with recursive function
+    git_tree *tree;
+    const git_tree_entry *entry;
     size_t parent_count = git_commit_parentcount(node->commit);
     git_commit *parent = NULL;
-    const char *entry_name = git_tree_entry_name(node->entry);
     for (size_t i = 0; i < parent_count; i++)
     {
         git_commit_parent(&parent, node->commit, i); // freed in recursive function if wont be used
-        search_commits_recursive(parent, node, visited, entry_name);
+        git_commit_tree(&tree, parent);
+        entry = git_tree_entry_byname(tree, git_tree_entry_name(node->entry));
+        search_git_tree_for_oldest_with_entry(parent, node, visited, entry);
     }
     // Mark as fetched and clean up
     node->ancestors_fetched = 1;
@@ -109,79 +112,93 @@ int commit_graph_fetch_ancestors(commit_graph_node_t *node)
     return 0;
 }
 
-void search_commits_recursive(git_commit *commit, commit_graph_node_t *search_root, visited_set_t *visited, const char *filename)
+// void search_git_tree_for_changed_file(git_commit *commit, commit_graph_node_t *search_root, visited_set_t *visited, git_tree_entry *entry)
+// {
+//     if (!commit || visited_set_contains(visited, git_commit_id(commit)))
+//     {
+//         return; // Stop if node is null or already visited
+//     }
+
+//     git_tree *tree;
+//     git_commit_tree(&tree, commit);
+//     const git_tree_entry *entry = git_tree_entry_byname(tree, git_tree_entry_name(search_root->entry));
+//     if (!entry)
+//     {
+//         git_tree_free(tree);
+//         visited_set_add(visited, git_commit_id(commit));
+//         git_commit_free(commit);
+//         return;
+//     }
+
+//     // If file was modified, add to ancestors and stop recursion
+//     if (!git_oid_equal( git_tree_entry_id(entry), git_tree_entry_id(entry)))
+//     {
+//         search_git_tree_for_oldest_with_entry(commit, search_root, visited, entry);
+//         return;
+//     }
+
+//     git_tree_free(tree);
+//     visited_set_add(visited, git_commit_id(commit));
+
+//     // Recurse into parents
+//     size_t parent_count = git_commit_parentcount(commit);
+//     git_commit *parent_commit;
+//     for (size_t i = 0; i < parent_count; i++)
+//     {
+//         git_commit_parent(&parent_commit, commit, i);
+//         search_commits_for_changed_file(parent_commit, search_root, visited, entry);
+//     }
+//     git_commit_free(commit);
+//     return;
+// }
+
+int search_git_tree_for_oldest_with_entry(git_commit *commit, commit_graph_node_t *for_result, visited_set_t *visited, const git_tree_entry *entry)
 {
     if (!commit || visited_set_contains(visited, git_commit_id(commit)))
     {
-        return; // Stop if node is null or already visited
+        return -1;
     }
-
-    // Add current commit to visited
     visited_set_add(visited, git_commit_id(commit));
 
-    // Check if the file was modified in this commit
     git_tree *tree;
     git_commit_tree(&tree, commit);
-    const git_tree_entry *entry = git_tree_entry_byname(tree, filename);
-    if (!entry)
+    const git_tree_entry *current_entry = git_tree_entry_byname(tree, git_tree_entry_name(entry));
+    if (!git_oid_equal(git_tree_entry_id(current_entry), git_tree_entry_id(entry)))
     {
-        // // check for rename
-        // if (entry) // renamed in commit
-        // {
-        //     search_root->ancestor_count++;
-        //     search_root->ancestors = realloc(search_root->ancestors, search_root->ancestor_count * sizeof(commit_graph_node_t *));
-        //     search_root->ancestors[search_root->ancestor_count - 1] = commit_graph_node_init();
-        //     search_root->ancestors[search_root->ancestor_count - 1]->commit = commit;
-        //     git_tree_entry *tmp_entry;
-        //     git_tree_entry_dup(&tmp_entry, entry);
-        //     search_root->ancestors[search_root->ancestor_count - 1]->entry = tmp_entry;
-        //     search_root->ancestors[search_root->ancestor_count - 1]->descendant = search_root;
-        //     git_tree_free(tree);
-        //     return;
-        // }
-        // File doesn't exist in this commit, stop recursion
-        git_tree_free(tree);
         git_commit_free(commit);
-        return;
-    }
-
-    // If file was modified, add to ancestors and stop recursion
-    if (!git_oid_equal(git_tree_entry_id(search_root->entry), git_tree_entry_id(entry)))
-    {
-        search_root->ancestor_count++;
-        search_root->ancestors = realloc(search_root->ancestors, search_root->ancestor_count * sizeof(commit_graph_node_t *));
-        search_root->ancestors[search_root->ancestor_count - 1] = commit_graph_node_init();
-        search_root->ancestors[search_root->ancestor_count - 1]->commit = commit;
-        git_tree_entry *tmp_entry;
-        git_tree_entry_dup(&tmp_entry, entry);
-        search_root->ancestors[search_root->ancestor_count - 1]->entry = tmp_entry;
-        search_root->ancestors[search_root->ancestor_count - 1]->descendant = search_root;
-        git_tree_free(tree);
-        return;
+        return 0;
     }
     git_tree_free(tree);
 
-    // Recurse into parents
+    int found = 0;
     size_t parent_count = git_commit_parentcount(commit);
     git_commit *parent_commit;
     for (size_t i = 0; i < parent_count; i++)
     {
         git_commit_parent(&parent_commit, commit, i);
-        search_commits_recursive(parent_commit, search_root, visited, filename);
+        found += search_git_tree_for_oldest_with_entry(parent_commit, for_result, visited, entry);
+    }
+    if (found == 0)
+    {
+        add_ancestor(for_result, commit, entry);
+        return 1;
     }
     git_commit_free(commit);
-    return;
+    return found;
 }
 
-void add_ancestor(commit_graph_node_t *search_root, git_commit *commit, const git_tree_entry *entry)
+void add_ancestor(commit_graph_node_t *node, git_commit *commit, const git_tree_entry *entry)
 {
-    search_root->ancestor_count++;
-    search_root->ancestors = realloc(search_root->ancestors, search_root->ancestor_count * sizeof(commit_graph_node_t *));
-    commit_graph_node_t *new_node = commit_graph_node_init();
-    search_root->ancestors[search_root->ancestor_count - 1] = new_node;
-    new_node->commit = commit;
-    git_tree_entry_dup(&(new_node->entry), entry);
-    new_node->descendant = search_root;
+    if (!node || !commit || !entry)
+    {
+        return;
+    }
+    node->ancestor_count++;
+    node->ancestors = realloc(node->ancestors, node->ancestor_count * sizeof(commit_graph_node_t *));
+    node->ancestors[node->ancestor_count - 1] = commit_graph_node_init();
+    node->ancestors[node->ancestor_count - 1]->commit = commit;
+    git_tree_entry_dup(&(node->ancestors[node->ancestor_count - 1]->entry), entry);
+    node->ancestors[node->ancestor_count - 1]->descendant = node;
 }
 
 int commit_graph_walk_to_ancestor(commit_graph_walk_t *walk, int ancestor_index)
