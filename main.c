@@ -128,6 +128,7 @@ int main(int argc, char *argv[])
                     commit_graph_walk_to_ancestor(active->walk, active->menu_state - 1);
                     active->menu_state = 0;
                     active->y_offset = 0;
+                    commit_display_load_buffer(active);
                     commit_display_get_diff(l_display, r_display);
                     if (r_display)
                     {
