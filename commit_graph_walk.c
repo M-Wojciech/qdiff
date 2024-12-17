@@ -154,35 +154,53 @@ int commit_graph_fetch_ancestors(commit_graph_node_t *node)
 
 int search_git_tree_for_oldest_with_entry(git_commit *commit, commit_graph_node_t *for_result, visited_set_t *visited, const git_tree_entry *entry)
 {
+    // Check for null or already visited commit
     if (!commit || visited_set_contains(visited, git_commit_id(commit)))
     {
-        return -1;
+        if (commit) git_commit_free(commit);
+        return 0;
     }
+
+    // Mark as visited
     visited_set_add(visited, git_commit_id(commit));
 
+    // Get the tree for this commit
     git_tree *tree;
-    git_commit_tree(&tree, commit);
-    const git_tree_entry *current_entry = git_tree_entry_byname(tree, git_tree_entry_name(entry));
-    if (!git_oid_equal(git_tree_entry_id(current_entry), git_tree_entry_id(entry)))
+    if (git_commit_tree(&tree, commit) != 0)
     {
         git_commit_free(commit);
         return 0;
     }
+
+    // Check if entry exists in this commit's tree
+    const git_tree_entry *current_entry = git_tree_entry_byname(tree, git_tree_entry_name(entry));
     git_tree_free(tree);
 
+    if (!current_entry || !git_oid_equal(git_tree_entry_id(current_entry), git_tree_entry_id(entry)))
+    {
+        return 0;
+    }
+
+    // Recurse into parents
     int found = 0;
     size_t parent_count = git_commit_parentcount(commit);
     git_commit *parent_commit;
     for (size_t i = 0; i < parent_count; i++)
     {
-        git_commit_parent(&parent_commit, commit, i);
-        found += search_git_tree_for_oldest_with_entry(parent_commit, for_result, visited, entry);
+        if (git_commit_parent(&parent_commit, commit, i) == 0)
+        {
+            int result = search_git_tree_for_oldest_with_entry(parent_commit, for_result, visited, entry);
+            found += result;
+        }
     }
+
+    // If no parents found with the entry, this might be the oldest
     if (found == 0)
     {
-        add_ancestor(for_result, commit, entry);
+        add_ancestor(for_result, commit, current_entry);
         return 1;
     }
+
     git_commit_free(commit);
     return found;
 }

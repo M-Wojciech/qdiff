@@ -52,8 +52,8 @@ int main(int argc, char *argv[])
     noecho();
     curs_set(0);
     keypad(stdscr, TRUE);
-    commit_display *l_display;
-    commit_display *r_display;
+    commit_display *l_display = NULL;
+    commit_display *r_display = NULL;
     l_display = commit_display_init(LINES, COLS, 0, 0, hold_walk);
     start_color();
     use_default_colors();
@@ -257,6 +257,7 @@ int main(int argc, char *argv[])
     nocbreak();
     attrset(A_NORMAL);
     endwin();
+    system("stty sane");
     commit_graph_walk_free(hold_walk);
     git_repository_free(repo);
     git_libgit2_shutdown();
