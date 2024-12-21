@@ -50,7 +50,7 @@ commit_graph_walk_t *commit_graph_walk_init(git_commit *start_commit, const char
 }
 
 // Recursive free function for freeing graph nodes and all its children
-void commit_graph_free_node(commit_graph_node_t *node)
+void commit_graph_node_free(commit_graph_node_t *node)
 {
     if (!node)
     {
@@ -58,7 +58,7 @@ void commit_graph_free_node(commit_graph_node_t *node)
     }
     for (size_t i = 0; i < node->ancestor_count; i++)
     {
-        commit_graph_free_node(node->ancestors[i]);
+        commit_graph_node_free(node->ancestors[i]);
     }
     free(node->ancestors);
     git_commit_free(node->commit);
@@ -77,7 +77,7 @@ void commit_graph_walk_free(commit_graph_walk_t *walk)
     {
         walk->current = walk->current->descendant;
     }
-    commit_graph_free_node(walk->current);
+    commit_graph_node_free(walk->current);
     free(walk);
 }
 
@@ -161,9 +161,6 @@ int search_git_tree_for_oldest_with_entry(git_commit *commit, commit_graph_node_
         return 0;
     }
 
-    // Mark as visited
-    visited_set_add(visited, git_commit_id(commit));
-
     // Get the tree for this commit
     git_tree *tree;
     if (git_commit_tree(&tree, commit) != 0)
@@ -172,14 +169,17 @@ int search_git_tree_for_oldest_with_entry(git_commit *commit, commit_graph_node_
         return 0;
     }
 
-    // Check if entry exists in this commit's tree
+    // Check if demanded entry exists in this commit's tree
     const git_tree_entry *current_entry = git_tree_entry_byname(tree, git_tree_entry_name(entry));
     git_tree_free(tree);
-
     if (!current_entry || !git_oid_equal(git_tree_entry_id(current_entry), git_tree_entry_id(entry)))
     {
+        git_commit_free(commit);
         return 0;
     }
+
+    // Mark as visited
+    visited_set_add(visited, git_commit_id(commit));
 
     // Recurse into parents
     int found = 0;
@@ -194,7 +194,7 @@ int search_git_tree_for_oldest_with_entry(git_commit *commit, commit_graph_node_
         }
     }
 
-    // If no parents found with the entry, this might be the oldest
+    // If no older commits found this is the oldes one
     if (found == 0)
     {
         add_ancestor(for_result, commit, current_entry);

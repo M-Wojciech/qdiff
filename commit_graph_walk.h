@@ -36,18 +36,20 @@ typedef struct
 } visited_set_t;
 
 commit_graph_node_t *commit_graph_node_init(void);
+void commit_graph_node_free(commit_graph_node_t *node);
 commit_graph_walk_t *commit_graph_walk_init(git_commit *start_commit, const char *_filename);
 void commit_graph_walk_free(commit_graph_walk_t *walk);
-int commit_graph_walk_to_ancestor(commit_graph_walk_t *walk, int ancestor_index);
-int commit_graph_walk_to_descendant(commit_graph_walk_t *walk);
 int commit_graph_fetch_ancestors(commit_graph_node_t *node);
-void search_git_tree_for_changed_file(git_commit *commit, commit_graph_node_t *search_root, visited_set_t *visited, git_tree_entry *file);
 int search_git_tree_for_oldest_with_entry(git_commit *commit, commit_graph_node_t *for_result, visited_set_t *visited, const git_tree_entry *entry);
 void add_ancestor(commit_graph_node_t *node, git_commit *commit, const git_tree_entry *entry);
+int commit_graph_walk_to_ancestor(commit_graph_walk_t *walk, int ancestor_index);
+int commit_graph_walk_to_descendant(commit_graph_walk_t *walk);
 
 visited_set_t *visited_set_init(void);
+void visited_set_free(visited_set_t *visited);
 void visited_set_add(visited_set_t *visited, const git_oid *oid);
 int visited_set_contains(visited_set_t *visited, const git_oid *oid);
-void visited_set_free(visited_set_t *visited);
+
+// void search_git_tree_for_changed_file(git_commit *commit, commit_graph_node_t *search_root, visited_set_t *visited, git_tree_entry *file);
 
 #endif

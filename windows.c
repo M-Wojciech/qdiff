@@ -116,7 +116,6 @@ void commit_display_load_buffer(commit_display *display)
     git_blob_lookup(&blob, git_commit_owner(display->walk->current->commit), git_tree_entry_id(display->walk->current->entry));
     size_t blob_size = git_blob_rawsize(blob);
     const char *blob_content = git_blob_rawcontent(blob);
-
     // count the number of lines in blob
     size_t blob_lines = 0;
     for (size_t i = 0; i < blob_size; i++)
