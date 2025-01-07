@@ -1,4 +1,5 @@
 #include <string.h>
+#include <ctype.h>
 #include "windows.h"
 
 #define DIFF_CONTEXT 0
@@ -73,7 +74,7 @@ void commit_display_update_file(commit_display *display)
         return;
     }
     wclear(display->file_content);
-    int y = 0, x;
+    int y = 0;
     int max_y = getmaxy(display->file_content);
     for (int i = display->y_offset; i < display->buffer_lines_count && y < max_y - 1; i++)
     {
@@ -104,7 +105,7 @@ void commit_display_update_file(commit_display *display)
         wattroff(display->file_content, COLOR_PAIR(2));
         wattroff(display->file_content, COLOR_PAIR(3));
 
-        getyx(display->file_content, y, x);
+        y = getcury(display->file_content);
     }
     wnoutrefresh(display->file_content);
 }
@@ -253,6 +254,8 @@ void commit_display_update_menu(commit_display *display)
     }
     // clear window
     wclear(display->file_content);
+    // get width
+    int max_x = getmaxx(display->file_content);
     // print menu options
     for (int i = 0; i < display->walk->current->ancestor_count; i++)
     {
@@ -262,7 +265,11 @@ void commit_display_update_menu(commit_display *display)
         {
             wattron(display->file_content, COLOR_PAIR(2));
         }
-        mvwprintw(display->file_content, i, 0, "%.6s\t%s", git_oid_tostr_s(comit_oid), message);
+        mvwprintw(display->file_content, i, 0, "%.6s  ", git_oid_tostr_s(comit_oid));
+        for (int j = 0; isprint(message[j]) && j+8 < max_x; j++)
+        {
+            mvwaddch(display->file_content, i, j+8, message[j]);
+        }
         wattroff(display->file_content, COLOR_PAIR(2));
     }
 
